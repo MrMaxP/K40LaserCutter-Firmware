@@ -53,8 +53,8 @@
     <ClInclude Include="ultralcd.h" />
     <ClInclude Include="ultralcd_implementation_hitachi_HD44780.h" />
     <ClInclude Include="ultralcd_st7920_u8glib_rrd.h" />
-    <ClInclude Include="Visual Micro\.Marlin.vsarduino.h" />
     <ClInclude Include="watchdog.h" />
+    <ClInclude Include="Visual Micro\.Marlin.vsarduino.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="K40Laser-Firmware.ino" />
