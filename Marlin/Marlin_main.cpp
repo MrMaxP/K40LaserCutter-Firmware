@@ -157,7 +157,7 @@ const char axis_codes[NUM_AXIS] = {'X', 'Y', 'Z'};
 static float destination[NUM_AXIS] = {  0.0, 0.0, 0.0};
 static float offset[3] = {0.0, 0.0, 0.0};
 static bool home_all_axis = true;
-static float feedrate = 2000.0, next_feedrate, saved_feedrate;
+static float feedrate = 5000.0, next_feedrate, saved_feedrate;
 static long gcode_N, gcode_LastN, Stopped_gcode_LastN = 0;
 
 static bool relative_mode = false;  //Determines Absolute or Relative Coordinates

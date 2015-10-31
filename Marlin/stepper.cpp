@@ -369,6 +369,11 @@ ISR(TIMER1_COMPA_vect)
 			laser_extinguish();
 		}
 
+		// STU: If the direction pins were all on the same port we could simple xor the out_bits with an invert bitmask and write the whole port
+		// This would save XYZ if tests and masking the port (Assumiung the rest of the port was unused or set to input)
+
+		// STU: We could then use a lookup table to set the count directions all in one go. No if's at all
+
 		// Set the direction bits
 		if((out_bits & (1<<X_AXIS)) !=0)
 		{
@@ -392,27 +397,30 @@ ISR(TIMER1_COMPA_vect)
 		}
 
 		// Set direction en check limit switches
-		if((out_bits & (1<<X_AXIS)) != 0)        // stepping along -X axis
+
+		// STU: Why is this written like this? The if statements here mimic the ones above. They can fold into each other
+
+		// STU: If the end stops were all on the same port, we can simply read in one go all 6 end stop inputs and xor with the inverts and test for non-zero
+		// THEN do the logic of an end stop hit instead of spending all this time checking them seperately
+
+		CHECK_ENDSTOPS
 		{
-			CHECK_ENDSTOPS
+			if ((out_bits & (1 << X_AXIS)) != 0)        // stepping along -X axis
 			{
 				{
 #if defined(X_MIN_PIN) && X_MIN_PIN > -1
-					bool x_min_endstop= (READ(X_MIN_PIN) != X_MIN_ENDSTOP_INVERTING);
-					if(x_min_endstop && old_x_min_endstop && (current_block->steps_x > 0))
+					bool x_min_endstop = (READ(X_MIN_PIN) != X_MIN_ENDSTOP_INVERTING);
+					if (x_min_endstop && old_x_min_endstop && (current_block->steps_x > 0))
 					{
 						endstops_trigsteps[X_AXIS] = count_position[X_AXIS];
-						endstop_x_hit=true;
+						endstop_x_hit = true;
 						step_events_completed = current_block->step_event_count;
 					}
 					old_x_min_endstop = x_min_endstop;
 #endif
 				}
 			}
-		}
-		else   // +direction
-		{
-			CHECK_ENDSTOPS
+			else   // +direction
 			{
 				{
 #if defined(X_MAX_PIN) && X_MAX_PIN > -1
@@ -427,27 +435,21 @@ ISR(TIMER1_COMPA_vect)
 #endif
 				}
 			}
-		}
 
-		if((out_bits & (1<<Y_AXIS)) != 0)        // -direction
-		{
-			CHECK_ENDSTOPS
+			if ((out_bits & (1 << Y_AXIS)) != 0)        // -direction
 			{
 #if defined(Y_MIN_PIN) && Y_MIN_PIN > -1
-				bool y_min_endstop= (READ(Y_MIN_PIN) != Y_MIN_ENDSTOP_INVERTING);
-				if(y_min_endstop && old_y_min_endstop && (current_block->steps_y > 0))
+				bool y_min_endstop = (READ(Y_MIN_PIN) != Y_MIN_ENDSTOP_INVERTING);
+				if (y_min_endstop && old_y_min_endstop && (current_block->steps_y > 0))
 				{
 					endstops_trigsteps[Y_AXIS] = count_position[Y_AXIS];
-					endstop_y_hit=true;
+					endstop_y_hit = true;
 					step_events_completed = current_block->step_event_count;
 				}
 				old_y_min_endstop = y_min_endstop;
 #endif
 			}
-		}
-		else   // +direction
-		{
-			CHECK_ENDSTOPS
+			else   // +direction
 			{
 #if defined(Y_MAX_PIN) && Y_MAX_PIN > -1
 				bool y_max_endstop= (READ(Y_MAX_PIN) != Y_MAX_ENDSTOP_INVERTING);
@@ -460,13 +462,15 @@ ISR(TIMER1_COMPA_vect)
 				old_y_max_endstop = y_max_endstop;
 #endif
 			}
+
 		}
+
 
 		if((out_bits & (1<<Z_AXIS)) != 0)        // -direction
 		{
 			WRITE(Z_DIR_PIN,INVERT_Z_DIR);
-
 			count_direction[Z_AXIS]=-1;
+
 			CHECK_ENDSTOPS
 			{
 #if defined(Z_MIN_PIN) && Z_MIN_PIN > -1
@@ -573,6 +577,7 @@ ISR(TIMER1_COMPA_vect)
 			step_events_completed += 1;
 			if(step_events_completed >= current_block->step_event_count) { break; }
 		}
+
 		// Calculare new timer value
 		unsigned short timer;
 		unsigned short step_rate;
@@ -625,6 +630,7 @@ ISR(TIMER1_COMPA_vect)
 		{
 			current_block = NULL;
 			plan_discard_current_block();
+			laser_extinguish();
 		}
 	}
 }

@@ -166,6 +166,7 @@ void calculate_trapezoid_for_block(block_t* block, float entry_factor, float exi
 	unsigned long final_rate = ceil(block->nominal_rate*exit_factor);    // (step/min)
 
 	// Limit minimal step rate (Otherwise the timer will overflow.)
+	// STU: TODO: Magic numbers
 	if(initial_rate <120)
 	{
 		initial_rate=120;
@@ -534,6 +535,7 @@ void plan_buffer_line(const float& x, const float& y, const float& z, float feed
 			//Scale the image intensity based on the raster power.
 			//100% power on a pixel basis is 255, convert back to 255 = 100.
 
+			// STU: I SEE A MAGIC NUMBER BODGE HERE: FIXME:
 			//http://stackoverflow.com/questions/929103/convert-a-number-range-to-another-range-maintaining-ratio
 			int OldRange, NewRange;
 			float NewValue;

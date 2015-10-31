@@ -321,7 +321,7 @@ static void lcd_prepare_menu()
 #endif
 	MENU_ITEM(gcode, MSG_DISABLE_STEPPERS, PSTR("M84"));
 	MENU_ITEM(gcode, "Enable Steppers", PSTR("M17"));
-	MENU_ITEM(gcode, MSG_AUTO_HOME, PSTR("G28 X Y F2000"));
+	MENU_ITEM(gcode, MSG_AUTO_HOME, PSTR("G28 X Y F5000"));
 	MENU_ITEM(gcode, MSG_SET_ORIGIN, PSTR("G92 X0 Y0 Z0"));
 	MENU_ITEM(submenu, MSG_MOVE_AXIS, lcd_move_menu);
 	END_MENU();
