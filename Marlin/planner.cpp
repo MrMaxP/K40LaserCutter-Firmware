@@ -97,6 +97,8 @@ static long x_segment_time[3]= {MAX_FREQ_TIME + 1,0,0};    // Segment times (in 
 static long y_segment_time[3]= {MAX_FREQ_TIME + 1,0,0};
 #endif
 
+extern unsigned short calc_timer(unsigned short step_rate);
+
 // Returns the index of the next block in the ring buffer
 // NOTE: Removed modulo (%) operator, which uses an expensive divide and multiplication.
 static int8_t next_block_index(int8_t block_index)
@@ -525,7 +527,7 @@ void plan_buffer_line(const float& x, const float& y, const float& z, float feed
 
 	// When operating in PULSED or RASTER modes, laser pulsing must operate in sync with movement.
 	// Calculate steps between laser firings (steps_l) and consider that when determining largest
-	// interval between steps for X, Y, Z, E, L to feed to the motion control code.
+	// interval between steps for X, Y, Z, L to feed to the motion control code.
 	if(laser.mode == RASTER || laser.mode == PULSED)
 	{
 		block->steps_l = labs(block->millimeters*laser.ppm);
@@ -556,14 +558,13 @@ void plan_buffer_line(const float& x, const float& y, const float& z, float feed
 	}
 	block->step_event_count = max(block->steps_x, max(block->steps_y, max(block->steps_z, block->steps_l)));
 
-	if(laser.diagnostics)
+#if defined( LASER_DIAGNOSTICS )
+	if(block->laser_status == LASER_ON)
 	{
-		if(block->laser_status == LASER_ON)
-		{
-			SERIAL_ECHO_START;
-			SERIAL_ECHOLNPGM("Laser firing enabled");
-		}
+		SERIAL_ECHO_START;
+		SERIAL_ECHOLNPGM("Laser firing enabled");
 	}
+#endif
 
 	float inverse_millimeters = 1.0/block->millimeters;  // Inverse millimeters to remove multiple divides
 
@@ -572,12 +573,7 @@ void plan_buffer_line(const float& x, const float& y, const float& z, float feed
 
 	int moves_queued= (block_buffer_head-block_buffer_tail + BLOCK_BUFFER_SIZE) & (BLOCK_BUFFER_SIZE - 1);
 
-	// slow down when de buffer starts to empty, rather than wait at the corner for a buffer refill
-#ifdef OLD_SLOWDOWN
-	if(moves_queued < (BLOCK_BUFFER_SIZE * 0.5) && moves_queued > 1)
-	{ feed_rate = feed_rate*moves_queued / (BLOCK_BUFFER_SIZE * 0.5); }
-#endif
-
+	// slow down when the buffer starts to empty, rather than wait at the corner for a buffer refill
 #ifdef SLOWDOWN
 	//  segment time im micro seconds
 	unsigned long segment_time = lround(1000000.0/inverse_second);
@@ -781,6 +777,9 @@ void plan_buffer_line(const float& x, const float& y, const float& z, float feed
 	memcpy(position, target, sizeof(target));       // position[] = target[]
 
 	planner_recalculate();
+
+	current_block->OCR1A_nominal = calc_timer(current_block->nominal_rate);
+	current_block->acceleration_time = calc_timer(current_block->initial_rate);
 
 	st_wake_up();
 }

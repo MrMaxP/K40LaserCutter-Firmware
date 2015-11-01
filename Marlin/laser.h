@@ -26,7 +26,7 @@
 // split into planned and status
 typedef struct
 {
-	int fired; // method used to ask the laser to fire - LASER_FIRE_G1, LASER_FIRE_SPINDLE, LASER_FIRE_E, etc
+	int fired; // method used to ask the laser to fire - LASER_FIRE_G1, LASER_FIRE_SPINDLE, etc
 	float intensity; // Laser firing instensity 0.0 - 100.0
 	float ppm; // pulses per millimeter, for pulsed firing mode
 	unsigned long duration; // laser firing duration in microseconds, for pulsed firing mode
@@ -35,7 +35,6 @@ typedef struct
 	bool firing; // LASER_ON / LASER_OFF - instantaneous
 	uint8_t mode; // CONTINUOUS, PULSED, RASTER
 	unsigned long last_firing; // microseconds since last laser firing
-	bool diagnostics; // Verbose debugging output over serial
 	unsigned int time; // temporary counter to limit eeprom writes
 	unsigned int lifetime; // laser lifetime firing counter in minutes
 	unsigned char raster_data[LASER_MAX_RASTER_LINE];

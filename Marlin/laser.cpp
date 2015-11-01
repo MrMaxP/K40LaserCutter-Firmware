@@ -87,7 +87,6 @@ void laser_init()
 	laser.firing = LASER_OFF;
 	laser.mode = CONTINUOUS;
 	laser.last_firing = 0;
-	laser.diagnostics = false;
 	laser.time = 0;
 	laser.raster_aspect_ratio = LASER_RASTER_ASPECT_RATIO;
 	laser.raster_mm_per_pulse = LASER_RASTER_MM_PER_PULSE;
@@ -106,10 +105,9 @@ void laser_fire(int intensity = 100.0)
 	analogWrite(LASER_INTENSITY_PIN, labs((intensity / 100.0) * (F_CPU / LASER_PWM)));
 	WRITE(LASER_FIRING_PIN, LOW);
 
-	if(laser.diagnostics)
-	{
-		SERIAL_ECHOLN("Laser fired");
-	}
+#if defined( LASER_DIAGNOSTICS )
+	SERIAL_ECHOLN("Laser fired");
+#endif
 }
 void laser_extinguish()
 {
@@ -121,10 +119,9 @@ void laser_extinguish()
 		WRITE(LASER_FIRING_PIN, HIGH);
 		laser.time += millis() - (laser.last_firing / 1000);
 
-		if(laser.diagnostics)
-		{
-			SERIAL_ECHOLN("Laser extinguished");
-		}
+#if defined( LASER_DIAGNOSTICS )
+		SERIAL_ECHOLN("Laser extinguished");
+#endif
 	}
 }
 void laser_set_mode(int mode)
@@ -150,41 +147,37 @@ bool laser_peripherals_ok()
 void laser_peripherals_on()
 {
 	digitalWrite(LASER_PERIPHERALS_PIN, LOW);
-	if(laser.diagnostics)
-	{
-		SERIAL_ECHO_START;
-		SERIAL_ECHOLNPGM("Laser Peripherals Enabled");
-	}
+#if defined( LASER_DIAGNOSTICS )
+	SERIAL_ECHO_START;
+	SERIAL_ECHOLNPGM("Laser Peripherals Enabled");
+#endif
 }
 void laser_peripherals_off()
 {
 	if(!digitalRead(LASER_PERIPHERALS_STATUS_PIN))
 	{
 		digitalWrite(LASER_PERIPHERALS_PIN, HIGH);
-		if(laser.diagnostics)
-		{
-			SERIAL_ECHO_START;
-			SERIAL_ECHOLNPGM("Laser Peripherals Disabled");
-		}
+#if defined( LASER_DIAGNOSTICS )
+		SERIAL_ECHO_START;
+		SERIAL_ECHOLNPGM("Laser Peripherals Disabled");
+#endif
 	}
 }
 void laser_wait_for_peripherals()
 {
 	unsigned long timeout = millis() + LASER_PERIPHERALS_TIMEOUT;
-	if(laser.diagnostics)
-	{
-		SERIAL_ECHO_START;
-		SERIAL_ECHOLNPGM("Waiting for peripheral control board signal...");
-	}
+#if defined( LASER_DIAGNOSTICS )
+	SERIAL_ECHO_START;
+	SERIAL_ECHOLNPGM("Waiting for peripheral control board signal...");
+#endif
 	while(!laser_peripherals_ok())
 	{
 		if(millis() > timeout)
 		{
-			if(laser.diagnostics)
-			{
-				SERIAL_ERROR_START;
-				SERIAL_ERRORLNPGM("Peripheral control board failed to respond");
-			}
+#if defined( LASER_DIAGNOSTICS )
+			SERIAL_ERROR_START;
+			SERIAL_ERRORLNPGM("Peripheral control board failed to respond");
+#endif
 			Stop();
 			break;
 		}

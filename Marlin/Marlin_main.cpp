@@ -712,7 +712,6 @@ void process_commands()
 		// S: Laser intensity %
 		// L: Laser duration ??????
 		// P: Laser PPM ?????????
-		// D: Laser diagnostics ?????
 		// B: Laser mode ?????
 		//////////////////////////////////////////////////////////////////////
 		case 1:
@@ -724,7 +723,6 @@ void process_commands()
 				if(code_seen('S') && !IsStopped()) { laser.intensity = (float) code_value(); }
 				if(code_seen('L') && !IsStopped()) { laser.duration = (unsigned long) labs(code_value()); }
 				if(code_seen('P') && !IsStopped()) { laser.ppm = (float) code_value(); }
-				if(code_seen('D') && !IsStopped()) { laser.diagnostics = (bool) code_value(); }
 				if(code_seen('B') && !IsStopped()) { laser_set_mode((int) code_value()); }
 
 				laser.status = LASER_ON;
@@ -751,7 +749,6 @@ void process_commands()
 		// S: Laser intensity %
 		// L: Laser duration ??????
 		// P: Laser PPM ?????????
-		// D: Laser diagnostics ?????
 		// B: Laser mode ?????
 		//////////////////////////////////////////////////////////////////////
 		case 2: // G2  - CW ARC
@@ -763,7 +760,6 @@ void process_commands()
 				if(code_seen('S') && !IsStopped()) { laser.intensity = (float) code_value(); }
 				if(code_seen('L') && !IsStopped()) { laser.duration = (unsigned long) labs(code_value()); }
 				if(code_seen('P') && !IsStopped()) { laser.ppm = (float) code_value(); }
-				if(code_seen('D') && !IsStopped()) { laser.diagnostics = (bool) code_value(); }
 				if(code_seen('B') && !IsStopped()) { laser_set_mode((int) code_value()); }
 
 				laser.status = LASER_ON;
@@ -789,7 +785,6 @@ void process_commands()
 		// S: Laser intensity %
 		// L: Laser duration ??????
 		// P: Laser PPM ?????????
-		// D: Laser diagnostics ?????
 		// B: Laser mode ?????
 		//////////////////////////////////////////////////////////////////////
 		case 3:
@@ -801,7 +796,6 @@ void process_commands()
 				if(code_seen('S') && !IsStopped()) { laser.intensity = (float) code_value(); }
 				if(code_seen('L') && !IsStopped()) { laser.duration = (unsigned long) labs(code_value()); }
 				if(code_seen('P') && !IsStopped()) { laser.ppm = (float) code_value(); }
-				if(code_seen('D') && !IsStopped()) { laser.diagnostics = (bool) code_value(); }
 				if(code_seen('B') && !IsStopped()) { laser_set_mode((int) code_value()); }
 
 				laser.status = LASER_ON;
@@ -846,30 +840,33 @@ void process_commands()
 		//		???? Missing data
 		//////////////////////////////////////////////////////////////////////
 		case 7: //G7 Execute raster line
-			if(code_seen('L')) { laser.raster_raw_length = int (code_value()); }
+			if(code_seen('L'))
+			{ laser.raster_raw_length = int (code_value()); }
+			
 			if(code_seen('$'))
 			{
 				laser.raster_direction = (bool) code_value();
 				destination[Y_AXIS] = current_position[Y_AXIS] + (laser.raster_mm_per_pulse * laser.raster_aspect_ratio);   // increment Y axis
 			}
-			if(code_seen('D')) { laser.raster_num_pixels = base64_decode(laser.raster_data, &cmdbuffer[bufindr][strchr_pointer - cmdbuffer[bufindr] + 1], laser.raster_raw_length); }
+			
+			if(code_seen('D')) 
+			{ laser.raster_num_pixels = base64_decode(laser.raster_data, &cmdbuffer[bufindr][strchr_pointer - cmdbuffer[bufindr] + 1], laser.raster_raw_length); }
+			
 			if(!laser.raster_direction)
 			{
 				destination[X_AXIS] = current_position[X_AXIS] - (laser.raster_mm_per_pulse * laser.raster_num_pixels);
-				if(laser.diagnostics)
-				{
-					SERIAL_ECHO_START;
-					SERIAL_ECHOLN("Negative Raster Line");
-				}
+#if defined( LASER_DIAGNOSTICS )
+				SERIAL_ECHO_START;
+				SERIAL_ECHOLN("Negative Raster Line");
+#endif
 			}
 			else
 			{
 				destination[X_AXIS] = current_position[X_AXIS] + (laser.raster_mm_per_pulse * laser.raster_num_pixels);
-				if(laser.diagnostics)
-				{
-					SERIAL_ECHO_START;
-					SERIAL_ECHOLN("Positive Raster Line");
-				}
+#if defined( LASER_DIAGNOSTICS )
+				SERIAL_ECHO_START;
+				SERIAL_ECHOLN("Positive Raster Line");
+#endif
 			}
 
 			laser.ppm = 1 / laser.raster_mm_per_pulse; //number of pulses per millimetre
@@ -1057,7 +1054,6 @@ void process_commands()
 			if(code_seen('S') && !IsStopped()) { laser.intensity = (float) code_value(); }
 			if(code_seen('L') && !IsStopped()) { laser.duration = (unsigned long) labs(code_value()); }
 			if(code_seen('P') && !IsStopped()) { laser.ppm = (float) code_value(); }
-			if(code_seen('D') && !IsStopped()) { laser.diagnostics = (bool) code_value(); }
 			if(code_seen('B') && !IsStopped()) { laser_set_mode((int) code_value()); }
 
 			laser.status = LASER_ON;
@@ -1498,7 +1494,6 @@ void process_commands()
 				}
 				if(code_seen('L') && !IsStopped()) { laser.duration = (unsigned long) labs(code_value()); }
 				if(code_seen('P') && !IsStopped()) { laser.ppm = (float) code_value(); }
-				if(code_seen('D') && !IsStopped()) { laser.diagnostics = (bool) code_value(); }
 				if(code_seen('B') && !IsStopped()) { laser_set_mode((int) code_value()); }
 				if(code_seen('R') && !IsStopped()) { laser.raster_mm_per_pulse = ((float) code_value()); }
 				if(code_seen('F'))
@@ -1670,19 +1665,7 @@ void prepare_move()
 
 	previous_millis_cmd = millis();
 
-#ifdef LASER_FIRE_E
-	if(0.0 != 0.0 && ((current_position[X_AXIS] != destination [X_AXIS]) || (current_position[Y_AXIS] != destination [Y_AXIS])))
-	{
-		laser.status = LASER_ON;
-		laser.fired = LASER_FIRE_E;
-	}
-	if(0.0 == 0.0 && laser.fired == LASER_FIRE_E)
-	{
-		laser.status = LASER_OFF;
-	}
-#endif // LASER_FIRE_E
-
-	// Do not use feedmultiply for E or Z only moves
+	// Do not use feedmultiply for Z only moves
 	if((current_position[X_AXIS] == destination [X_AXIS]) && (current_position[Y_AXIS] == destination [Y_AXIS]))
 	{
 		plan_buffer_line(destination[X_AXIS], destination[Y_AXIS], destination[Z_AXIS], feedrate/60);
@@ -1820,7 +1803,9 @@ void kill()
 
 void Stop()
 {
-	if(laser.diagnostics) { SERIAL_ECHOLN("Laser set to off, stop() called"); }
+#if defined( LASER_DIAGNOSTICS )
+	SERIAL_ECHOLN("Laser set to off, stop() called");
+#endif
 	laser_extinguish();
 
 #ifdef LASER_PERIPHERALS

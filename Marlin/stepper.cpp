@@ -246,27 +246,32 @@ void step_wait()
 }
 
 
-FORCE_INLINE unsigned short calc_timer(unsigned short step_rate)
+FORCE_INLINE unsigned short calc_steploops(unsigned short step_rate)
 {
-	unsigned short timer;
-	if(step_rate > MAX_STEP_FREQUENCY) { step_rate = MAX_STEP_FREQUENCY; }
+	if (step_rate > MAX_STEP_FREQUENCY)
+	{ step_rate = MAX_STEP_FREQUENCY; }
 
-	if(step_rate > 20000)    // If steprate > 20kHz >> step 4 times
+	if (step_rate > 20000)    // If steprate > 20kHz >> step 4 times
 	{
-		step_rate = (step_rate >> 2) &0x3fff;
+		step_rate = (step_rate >> 2) & 0x3fff;
 		step_loops = 4;
 	}
-	else if(step_rate > 10000)    // If steprate > 10kHz >> step 2 times
+	else if (step_rate > 10000)    // If steprate > 10kHz >> step 2 times
 	{
-		step_rate = (step_rate >> 1) &0x7fff;
+		step_rate = (step_rate >> 1) & 0x7fff;
 		step_loops = 2;
 	}
 	else
 	{
 		step_loops = 1;
 	}
+}
 
-	if(step_rate < (F_CPU/500000)) { step_rate = (F_CPU/500000); }
+FORCE_INLINE unsigned short calc_timer(unsigned short step_rate)
+{
+	unsigned short timer;
+
+	if (step_rate < (F_CPU / 500000)) { step_rate = (F_CPU / 500000); }
 	step_rate -= (F_CPU/500000);   // Correct for minimal speed
 	if(step_rate >= (8*256))      // higher step rate
 	{
@@ -293,11 +298,13 @@ FORCE_INLINE void trapezoid_generator_reset()
 {
 	deceleration_time = 0;
 	// step_rate to timer interval
-	OCR1A_nominal = calc_timer(current_block->nominal_rate);
+	OCR1A_nominal = current_block->OCR1A_nominal;	// calc_timer(current_block->nominal_rate);
+	calc_steploops(current_block->nominal_rate);
 	// make a note of the number of step loops required at nominal speed
 	step_loops_nominal = step_loops;
 	acc_step_rate = current_block->initial_rate;
-	acceleration_time = calc_timer(acc_step_rate);
+	acceleration_time = current_block->acceleration_time;	// calc_timer(acc_step_rate);
+	calc_steploops(acc_step_rate);
 	OCR1A = acceleration_time;
 
 //    SERIAL_ECHO_START;
@@ -318,7 +325,9 @@ ISR(TIMER1_COMPA_vect)
 {
 	if(laser.dur != 0 && (laser.last_firing + laser.dur < micros()))
 	{
-		if(laser.diagnostics) { SERIAL_ECHOLN("Laser firing duration elapsed, in interrupt handler"); }
+#if defined( LASER_DIAGNOSTICS )
+		SERIAL_ECHOLN("Laser firing duration elapsed, in interrupt handler");
+#endif
 		laser_extinguish();
 	}
 
@@ -365,7 +374,9 @@ ISR(TIMER1_COMPA_vect)
 		}
 		if(current_block->laser_status == LASER_OFF)
 		{
-			if(laser.diagnostics) { SERIAL_ECHOLN("Laser status set to off, in interrupt handler"); }
+#if defined( LASER_DIAGNOSTICS )
+			SERIAL_ECHOLN("Laser status set to off, in interrupt handler");
+#endif
 			laser_extinguish();
 		}
 
@@ -465,7 +476,7 @@ ISR(TIMER1_COMPA_vect)
 
 		}
 
-
+/*
 		if((out_bits & (1<<Z_AXIS)) != 0)        // -direction
 		{
 			WRITE(Z_DIR_PIN,INVERT_Z_DIR);
@@ -504,6 +515,8 @@ ISR(TIMER1_COMPA_vect)
 #endif
 			}
 		}
+*/
+
 
 		for(int8_t i=0; i < step_loops; i++)    // Take multiple steps per interrupt (For high speed moves)
 		{
@@ -528,7 +541,7 @@ ISR(TIMER1_COMPA_vect)
 				count_position[Y_AXIS]+=count_direction[Y_AXIS];
 				WRITE(Y_STEP_PIN, INVERT_Y_STEP_PIN);
 			}
-
+/*
 			counter_z += current_block->steps_z;
 			if(counter_z > 0)
 			{
@@ -539,7 +552,7 @@ ISR(TIMER1_COMPA_vect)
 				WRITE(Z_STEP_PIN, INVERT_Z_STEP_PIN);
 
 			}
-
+*/
 			// steps_l = step count between laser firings
 			//
 			counter_l += current_block->steps_l;
@@ -548,21 +561,19 @@ ISR(TIMER1_COMPA_vect)
 				if(current_block->laser_mode == PULSED && current_block->laser_status == LASER_ON)    // Pulsed Firing Mode
 				{
 					laser_fire(current_block->laser_intensity);
-					if(laser.diagnostics)
-					{
-						SERIAL_ECHOPAIR("X: ", counter_x);
-						SERIAL_ECHOPAIR("Y: ", counter_y);
-						SERIAL_ECHOPAIR("L: ", counter_l);
-					}
+#if defined( LASER_DIAGNOSTICS )
+					SERIAL_ECHOPAIR("X: ", counter_x);
+					SERIAL_ECHOPAIR("Y: ", counter_y);
+					SERIAL_ECHOPAIR("L: ", counter_l);
+#endif
 				}
 
 				if(current_block->laser_mode == RASTER && current_block->laser_status == LASER_ON)    // Raster Firing Mode
 				{
 					laser_fire(current_block->laser_raster_data[counter_raster]);    //For some reason, when comparing raster power to ppm line burns the rasters were around 2% more powerful - going from darkened paper to burning through paper.
-					if(laser.diagnostics)
-					{
-						SERIAL_ECHOPAIR("Pixel: ", (float) current_block->laser_raster_data[counter_raster]);
-					}
+#if defined( LASER_DIAGNOSTICS )
+					SERIAL_ECHOPAIR("Pixel: ", (float)current_block->laser_raster_data[counter_raster]);
+#endif
 					counter_raster++;
 				}
 
@@ -570,7 +581,9 @@ ISR(TIMER1_COMPA_vect)
 			}
 			if(current_block->laser_duration != 0 && (laser.last_firing + current_block->laser_duration < micros()))
 			{
-				if(laser.diagnostics) { SERIAL_ECHOLN("Laser firing duration elapsed, in interrupt fast loop"); }
+#if defined( LASER_DIAGNOSTICS )
+				SERIAL_ECHOLN("Laser firing duration elapsed, in interrupt fast loop");
+#endif
 				laser_extinguish();
 			}
 
