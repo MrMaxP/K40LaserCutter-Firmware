@@ -63,8 +63,6 @@ typedef struct
 	int laser_intensity; // Laser firing instensity in clock cycles for the PWM timer
 	long acceleration_time;								// Precalc of calc_timer(acc_step_rate);
 	unsigned short OCR1A_nominal;						// Precalc of calc_timer(current_block->nominal_rate);
-	unsigned short step_loops_nominal;
-	unsigned short step_loops;
 	unsigned char laser_raster_data[LASER_MAX_RASTER_LINE];
 	volatile char busy;
 } block_t;

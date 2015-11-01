@@ -47,10 +47,7 @@ block_t* current_block;  // A pointer to the block currently being traced
 // Variables used by The Stepper Driver Interrupt
 static unsigned char out_bits;        // The next stepping-bits to be output
 static long counter_x,       // Counter variables for the bresenham line tracer
-       counter_y,
-       counter_z,
-       counter_e;
-
+			counter_y;
 static long counter_l;
 static int counter_raster;
 
@@ -248,31 +245,52 @@ void step_wait()
 
 FORCE_INLINE unsigned short calc_steploops(unsigned short step_rate)
 {
+	unsigned char loops;
+
 	if (step_rate > MAX_STEP_FREQUENCY)
 	{ step_rate = MAX_STEP_FREQUENCY; }
 
 	if (step_rate > 20000)    // If steprate > 20kHz >> step 4 times
 	{
+		loops = 4;
+	}
+	else if (step_rate > 10000)    // If steprate > 10kHz >> step 2 times
+	{
+		loops = 2;
+	}
+	else
+	{
+		loops = 1;
+	}
+
+	return loops;
+}
+
+unsigned short calc_timer(unsigned short step_rate)
+{
+	unsigned short timer;
+
+	if (step_rate > MAX_STEP_FREQUENCY)
+	{
+		step_rate = MAX_STEP_FREQUENCY;
+	}
+
+	if (step_rate > 20000)    // If steprate > 20kHz >> step 4 times
+	{
 		step_rate = (step_rate >> 2) & 0x3fff;
-		step_loops = 4;
 	}
 	else if (step_rate > 10000)    // If steprate > 10kHz >> step 2 times
 	{
 		step_rate = (step_rate >> 1) & 0x7fff;
-		step_loops = 2;
 	}
-	else
+
+	if (step_rate < (F_CPU / 500000))
 	{
-		step_loops = 1;
+		step_rate = (F_CPU / 500000);
 	}
-}
 
-FORCE_INLINE unsigned short calc_timer(unsigned short step_rate)
-{
-	unsigned short timer;
+	step_rate -= (F_CPU / 500000);   // Correct for minimal speed
 
-	if (step_rate < (F_CPU / 500000)) { step_rate = (F_CPU / 500000); }
-	step_rate -= (F_CPU/500000);   // Correct for minimal speed
 	if(step_rate >= (8*256))      // higher step rate
 	{
 		unsigned short table_address = (unsigned short) &speed_lookuptable_fast[(unsigned char)(step_rate>>8)][0];
@@ -288,7 +306,10 @@ FORCE_INLINE unsigned short calc_timer(unsigned short step_rate)
 		timer = (unsigned short) pgm_read_word_near(table_address);
 		timer -= (((unsigned short) pgm_read_word_near(table_address+2) * (unsigned char)(step_rate & 0x0007)) >>3);
 	}
-	if(timer < 100) { timer = 100; MYSERIAL.print(MSG_STEPPER_TOO_HIGH); MYSERIAL.println(step_rate); }          //(20kHz this should never happen)
+	
+	if(timer < 100)
+	{ timer = 100; MYSERIAL.print(MSG_STEPPER_TOO_HIGH); MYSERIAL.println(step_rate); }          //(20kHz this should never happen)
+	
 	return timer;
 }
 
@@ -297,14 +318,11 @@ FORCE_INLINE unsigned short calc_timer(unsigned short step_rate)
 FORCE_INLINE void trapezoid_generator_reset()
 {
 	deceleration_time = 0;
-	// step_rate to timer interval
 	OCR1A_nominal = current_block->OCR1A_nominal;	// calc_timer(current_block->nominal_rate);
-	calc_steploops(current_block->nominal_rate);
-	// make a note of the number of step loops required at nominal speed
-	step_loops_nominal = step_loops;
+	step_loops_nominal = calc_steploops(current_block->nominal_rate);
 	acc_step_rate = current_block->initial_rate;
 	acceleration_time = current_block->acceleration_time;	// calc_timer(acc_step_rate);
-	calc_steploops(acc_step_rate);
+	step_loops = calc_steploops(acc_step_rate);
 	OCR1A = acceleration_time;
 
 //    SERIAL_ECHO_START;
@@ -313,7 +331,7 @@ FORCE_INLINE void trapezoid_generator_reset()
 //    SERIAL_ECHOPGM("advance rate :");
 //    SERIAL_ECHO(current_block->advance_rate/256.0);
 //    SERIAL_ECHOPGM("initial advance :");
-//  SERIAL_ECHO(current_block->initial_advance/256.0);
+//    SERIAL_ECHO(current_block->initial_advance/256.0);
 //    SERIAL_ECHOPGM("final advance :");
 //    SERIAL_ECHOLN(current_block->final_advance/256.0);
 
@@ -342,7 +360,6 @@ ISR(TIMER1_COMPA_vect)
 			trapezoid_generator_reset();
 			counter_x = - (current_block->step_event_count >> 1);
 			counter_y = counter_x;
-			counter_z = counter_x;
 			counter_l = counter_x;
 			laser.dur = current_block->laser_duration;
 			step_events_completed = 0;
@@ -364,7 +381,7 @@ ISR(TIMER1_COMPA_vect)
 
 	if(current_block != NULL)
 	{
-		// Set directions TO DO This should be done once during init of trapezoid. Endstops -> interrupt
+		// Set directions TO DO This should be done once during init of trapezoid. Endstops -> interrupt STU: TODO; Move this to init of block
 		out_bits = current_block->direction_bits;
 
 		// Continuous firing of the laser during a move happens here, PPM and raster happen further down
@@ -385,7 +402,7 @@ ISR(TIMER1_COMPA_vect)
 
 		// STU: We could then use a lookup table to set the count directions all in one go. No if's at all
 
-		// Set the direction bits
+		// Set the direction bits STU: TODO; Move this to init of block
 		if((out_bits & (1<<X_AXIS)) !=0)
 		{
 			WRITE(X_DIR_PIN, INVERT_X_DIR);
@@ -476,48 +493,6 @@ ISR(TIMER1_COMPA_vect)
 
 		}
 
-/*
-		if((out_bits & (1<<Z_AXIS)) != 0)        // -direction
-		{
-			WRITE(Z_DIR_PIN,INVERT_Z_DIR);
-			count_direction[Z_AXIS]=-1;
-
-			CHECK_ENDSTOPS
-			{
-#if defined(Z_MIN_PIN) && Z_MIN_PIN > -1
-				bool z_min_endstop= (READ(Z_MIN_PIN) != Z_MIN_ENDSTOP_INVERTING);
-				if(z_min_endstop && old_z_min_endstop && (current_block->steps_z > 0))
-				{
-					endstops_trigsteps[Z_AXIS] = count_position[Z_AXIS];
-					endstop_z_hit=true;
-					step_events_completed = current_block->step_event_count;
-				}
-				old_z_min_endstop = z_min_endstop;
-#endif
-			}
-		}
-		else   // +direction
-		{
-			WRITE(Z_DIR_PIN,!INVERT_Z_DIR);
-
-			count_direction[Z_AXIS]=1;
-			CHECK_ENDSTOPS
-			{
-#if defined(Z_MAX_PIN) && Z_MAX_PIN > -1
-				bool z_max_endstop= (READ(Z_MAX_PIN) != Z_MAX_ENDSTOP_INVERTING);
-				if(z_max_endstop && old_z_max_endstop && (current_block->steps_z > 0))
-				{
-					endstops_trigsteps[Z_AXIS] = count_position[Z_AXIS];
-					endstop_z_hit=true;
-					step_events_completed = current_block->step_event_count;
-				}
-				old_z_max_endstop = z_max_endstop;
-#endif
-			}
-		}
-*/
-
-
 		for(int8_t i=0; i < step_loops; i++)    // Take multiple steps per interrupt (For high speed moves)
 		{
 #ifndef AT90USB
@@ -541,18 +516,7 @@ ISR(TIMER1_COMPA_vect)
 				count_position[Y_AXIS]+=count_direction[Y_AXIS];
 				WRITE(Y_STEP_PIN, INVERT_Y_STEP_PIN);
 			}
-/*
-			counter_z += current_block->steps_z;
-			if(counter_z > 0)
-			{
-				WRITE(Z_STEP_PIN, !INVERT_Z_STEP_PIN);
 
-				counter_z -= current_block->step_event_count;
-				count_position[Z_AXIS]+=count_direction[Z_AXIS];
-				WRITE(Z_STEP_PIN, INVERT_Z_STEP_PIN);
-
-			}
-*/
 			// steps_l = step count between laser firings
 			//
 			counter_l += current_block->steps_l;
