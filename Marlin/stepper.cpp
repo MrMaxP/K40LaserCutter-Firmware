@@ -591,7 +591,7 @@ ISR(TIMER1_COMPA_vect)
 			if(step_events_completed >= current_block->step_event_count) { break; }
 		}
 
-		// Calculare new timer value
+		// Calculate new timer value
 		unsigned short timer;
 		unsigned short step_rate;
 		if(step_events_completed <= (unsigned long int) current_block->accelerate_until)      // Accelerate!
